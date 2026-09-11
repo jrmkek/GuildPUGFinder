@@ -1,0 +1,61 @@
+<Window x:Class="GuildPUGFinderApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GuildPUGFinder" Height="600" Width="900">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: filter controls -->
+        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+            <TextBlock Text="Min best parse %" FontWeight="Bold"/>
+            <TextBox x:Name="MinParseBox" Text="50" Margin="0,2,0,10"/>
+
+            <TextBlock Text="Min average item level" FontWeight="Bold"/>
+            <TextBox x:Name="MinIlvlBox" Text="125" Margin="0,2,0,10"/>
+
+            <CheckBox x:Name="UsePerBossCheck" Content="Also require EVERY boss parse ≥" Margin="0,0,0,4"/>
+            <TextBox x:Name="MinPerBossBox" Text="40" Margin="0,0,0,14" IsEnabled="{Binding ElementName=UsePerBossCheck, Path=IsChecked}"/>
+
+            <CheckBox x:Name="ShowPerBossCheck" Content="Show per-boss parses in table" Margin="0,0,0,14" Checked="ShowPerBossCheck_Changed" Unchecked="ShowPerBossCheck_Changed"/>
+
+            <TextBlock Text="Partition (blank = all-time)" FontWeight="Bold"/>
+            <TextBox x:Name="PartitionBox" Text="" Margin="0,2,0,14"/>
+
+            <TextBlock Text="Classes (none checked = any)" FontWeight="Bold" Margin="0,0,0,4"/>
+            <CheckBox x:Name="ClassWarrior" Content="Warrior"/>
+            <CheckBox x:Name="ClassPaladin" Content="Paladin"/>
+            <CheckBox x:Name="ClassHunter" Content="Hunter"/>
+            <CheckBox x:Name="ClassRogue" Content="Rogue"/>
+            <CheckBox x:Name="ClassPriest" Content="Priest"/>
+            <CheckBox x:Name="ClassShaman" Content="Shaman"/>
+            <CheckBox x:Name="ClassMage" Content="Mage"/>
+            <CheckBox x:Name="ClassWarlock" Content="Warlock"/>
+            <CheckBox x:Name="ClassDruid" Content="Druid"/>
+
+            <Button x:Name="RunButton" Content="Run" Margin="0,16,0,6" Padding="0,6" Click="RunButton_Click"/>
+            <Button x:Name="WatchButton" Content="Start Watching" Padding="0,6" Click="WatchButton_Click"/>
+
+            <TextBlock x:Name="StatusText" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="Gray"/>
+
+            <TextBlock Text="Raw class names seen (for checking the boxes above match):" Margin="0,20,0,2" TextWrapping="Wrap" FontSize="10" Foreground="Gray"/>
+            <TextBlock x:Name="SeenClassesText" TextWrapping="Wrap" FontSize="10" Foreground="Gray"/>
+        </StackPanel>
+
+        <!-- Right: results -->
+        <DataGrid x:Name="ResultsGrid" Grid.Column="1" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
+                <DataGridTextColumn Header="Parse %" Binding="{Binding BestParsePercent}" Width="70"/>
+                <DataGridTextColumn Header="Ilvl" Binding="{Binding AverageItemLevel}" Width="60"/>
+                <DataGridTextColumn Header="Class" Binding="{Binding ClassName}" Width="80"/>
+                <DataGridTextColumn Header="Spec" Binding="{Binding Spec}" Width="100"/>
+                <DataGridTextColumn Header="Error" Binding="{Binding ErrorMessage}" Width="250"/>
+                <DataGridTextColumn x:Name="PerBossColumn" Header="Per-boss" Binding="{Binding PerBossText}" Width="300" Visibility="Collapsed"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Window>

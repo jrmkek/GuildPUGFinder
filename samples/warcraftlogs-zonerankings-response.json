@@ -1,0 +1,507 @@
+Querying character 'Scrotul' on spineshatter-eu...
+
+HTTP status: 200
+Raw response: {
+    "data": {
+        "characterData": {
+            "character": {
+                "id": 106456504,
+                "name": "Scrotul",
+                "classID": 4,
+                "server": {
+                    "name": "Spineshatter",
+                    "region": {
+                        "name": "Europe"
+                    }
+                },
+                "zoneRankings": {
+                    "bestPerformanceAverage": 75.41304615384614,
+                    "medianPerformanceAverage": 67.5212846153846,
+                    "difficulty": 3,
+                    "metric": "dps",
+                    "partition": -1,
+                    "zone": 1060,
+                    "size": 25,
+                    "allStars": [
+                        {
+                            "partition": 3,
+                            "spec": "Arcane",
+                            "points": 1144.72,
+                            "possiblePoints": 1560,
+                            "rank": 3358,
+                            "regionRank": 1938,
+                            "serverRank": 1375,
+                            "rankPercent": 88.0953225291677,
+                            "total": 28199,
+                            "rankTooltip": null
+                        }
+                    ],
+                    "rankings": [
+                        {
+                            "encounter": {
+                                "id": 50601,
+                                "name": "High Warlord Naj'entus"
+                            },
+                            "rankPercent": 24.3944,
+                            "medianPercent": 15.4494,
+                            "lockedIn": true,
+                            "totalKills": 2,
+                            "fastestKill": 157498,
+                            "allStars": {
+                                "points": 52.14,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 16162,
+                                "regionRank": 6656,
+                                "serverRank": 3840,
+                                "rankPercent": 25.305047143649475,
+                                "total": 21636
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1402.7869343722,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 7675504,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1402.7869343722,
+                                "ilvl": 130,
+                                "fight_metadata": 996898
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50602,
+                                "name": "Supremus"
+                            },
+                            "rankPercent": 19.8722,
+                            "medianPercent": 19.2902,
+                            "lockedIn": true,
+                            "totalKills": 2,
+                            "fastestKill": 203626,
+                            "allStars": {
+                                "points": 41.36,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 17965,
+                                "regionRank": 6940,
+                                "serverRank": 3943,
+                                "rankPercent": 17.151685652354377,
+                                "total": 21683
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1059.7222358638,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15580776,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1059.7222358638,
+                                "ilvl": 130,
+                                "fight_metadata": 996909
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50603,
+                                "name": "Shade of Akama"
+                            },
+                            "rankPercent": 51.666,
+                            "medianPercent": 32.8963,
+                            "lockedIn": true,
+                            "totalKills": 2,
+                            "fastestKill": 109783,
+                            "allStars": {
+                                "points": 0,
+                                "possiblePoints": 0,
+                                "partition": 3,
+                                "rank": 12425,
+                                "regionRank": 5040,
+                                "serverRank": 2878,
+                                "rankPercent": 41.81068802398014,
+                                "total": 21351
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1353.2873834615,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 7699759,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1353.2873834615,
+                                "ilvl": 130,
+                                "fight_metadata": 996910
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50604,
+                                "name": "Teron Gorefiend"
+                            },
+                            "rankPercent": 83.7733,
+                            "medianPercent": 50.4532,
+                            "lockedIn": true,
+                            "totalKills": 2,
+                            "fastestKill": 144488,
+                            "allStars": {
+                                "points": 94.82,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 3728,
+                                "regionRank": 2073,
+                                "serverRank": 1411,
+                                "rankPercent": 82.38990738990739,
+                                "total": 21164
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 2301.0976690106,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15581519,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 2301.0976690106,
+                                "ilvl": 130,
+                                "fight_metadata": 996911
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50605,
+                                "name": "Gurtogg Bloodboil"
+                            },
+                            "rankPercent": 97.1819,
+                            "medianPercent": 97.1819,
+                            "lockedIn": true,
+                            "totalKills": 1,
+                            "fastestKill": 164025,
+                            "allStars": {
+                                "points": 111.42,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 696,
+                                "regionRank": 433,
+                                "serverRank": 323,
+                                "rankPercent": 96.28163287143545,
+                                "total": 18691
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 2274.2142966011,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15775707,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 2274.2142966011,
+                                "ilvl": 130,
+                                "fight_metadata": 996912
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50606,
+                                "name": "Reliquary of Souls"
+                            },
+                            "rankPercent": 93.2835,
+                            "medianPercent": 93.2835,
+                            "lockedIn": true,
+                            "totalKills": 1,
+                            "fastestKill": 299256,
+                            "allStars": {
+                                "points": 106.46,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 1615,
+                                "regionRank": 871,
+                                "serverRank": 609,
+                                "rankPercent": 91.64898846173746,
+                                "total": 19327
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 2473.4421081666,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15581618,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 2473.4421081666,
+                                "ilvl": 130,
+                                "fight_metadata": 996913
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50607,
+                                "name": "Mother Shahraz"
+                            },
+                            "rankPercent": 89.4398,
+                            "medianPercent": 89.4398,
+                            "lockedIn": true,
+                            "totalKills": 1,
+                            "fastestKill": 182389,
+                            "allStars": {
+                                "points": 100.32,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 2046,
+                                "regionRank": 1162,
+                                "serverRank": 879,
+                                "rankPercent": 87.99812195551382,
+                                "total": 17039
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1974.4227996206,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15775731,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1974.4227996206,
+                                "ilvl": 129,
+                                "fight_metadata": 996914
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50608,
+                                "name": "The Illidari Council"
+                            },
+                            "rankPercent": 95.6679,
+                            "medianPercent": 95.6679,
+                            "lockedIn": true,
+                            "totalKills": 1,
+                            "fastestKill": 310153,
+                            "allStars": {
+                                "points": 109.28,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 734,
+                                "regionRank": 464,
+                                "serverRank": 344,
+                                "rankPercent": 94.91113579561232,
+                                "total": 14404
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1542.8643282509,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15672453,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1542.8643282509,
+                                "ilvl": 130,
+                                "fight_metadata": 996883
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50609,
+                                "name": "Illidan Stormrage"
+                            },
+                            "rankPercent": 81.9485,
+                            "medianPercent": 81.9485,
+                            "lockedIn": true,
+                            "totalKills": 1,
+                            "fastestKill": 425890,
+                            "allStars": {
+                                "points": 96.17,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 2245,
+                                "regionRank": 1296,
+                                "serverRank": 959,
+                                "rankPercent": 80.68846815834767,
+                                "total": 11620
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1541.5083707061,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 15775779,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1541.5083707061,
+                                "ilvl": 130,
+                                "fight_metadata": 996915
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50618,
+                                "name": "Rage Winterchill"
+                            },
+                            "rankPercent": 67.6755,
+                            "medianPercent": 35.8659,
+                            "lockedIn": true,
+                            "totalKills": 2,
+                            "fastestKill": 149776,
+                            "allStars": {
+                                "points": 79.58,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 7723,
+                                "regionRank": 4112,
+                                "serverRank": 2651,
+                                "rankPercent": 67.88655077767612,
+                                "total": 24046
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 2003.3850550155,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 17950032,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 2003.3850550155,
+                                "ilvl": 130,
+                                "fight_metadata": 996916
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50619,
+                                "name": "Anetheron"
+                            },
+                            "rankPercent": 71.1427,
+                            "medianPercent": 65.0643,
+                            "lockedIn": true,
+                            "totalKills": 2,
+                            "fastestKill": 110885,
+                            "allStars": {
+                                "points": 69.99,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 9697,
+                                "regionRank": 5155,
+                                "serverRank": 3217,
+                                "rankPercent": 59.47335423197492,
+                                "total": 23925
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1946.6217788378,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 7699564,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1946.6217788378,
+                                "ilvl": 130,
+                                "fight_metadata": 996917
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50620,
+                                "name": "Kaz'rogal"
+                            },
+                            "rankPercent": 95.0606,
+                            "medianPercent": 81.5043,
+                            "lockedIn": true,
+                            "totalKills": 3,
+                            "fastestKill": 111476,
+                            "allStars": {
+                                "points": 109.18,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 1156,
+                                "regionRank": 728,
+                                "serverRank": 535,
+                                "rankPercent": 95.06789648987959,
+                                "total": 23418
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 2471.6172090854,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 17977607,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 2471.6172090854,
+                                "ilvl": 130,
+                                "fight_metadata": 996918
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50621,
+                                "name": "Azgalor"
+                            },
+                            "rankPercent": 72.5211,
+                            "medianPercent": 70.3926,
+                            "lockedIn": true,
+                            "totalKills": 3,
+                            "fastestKill": 129905,
+                            "allStars": {
+                                "points": 80.28,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 6766,
+                                "regionRank": 3650,
+                                "serverRank": 2355,
+                                "rankPercent": 70.46883184913567,
+                                "total": 22908
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1535.4297371156,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 18046932,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1535.4297371156,
+                                "ilvl": 130,
+                                "fight_metadata": 996919
+                            }
+                        },
+                        {
+                            "encounter": {
+                                "id": 50622,
+                                "name": "Archimonde"
+                            },
+                            "rankPercent": 88.4082,
+                            "medianPercent": 82.2352,
+                            "lockedIn": true,
+                            "totalKills": 3,
+                            "fastestKill": 143957,
+                            "allStars": {
+                                "points": 93.72,
+                                "possiblePoints": 120,
+                                "partition": 3,
+                                "rank": 3613,
+                                "regionRank": 2134,
+                                "serverRank": 1476,
+                                "rankPercent": 82.76964174974955,
+                                "total": 20963
+                            },
+                            "spec": "Arcane",
+                            "bestSpec": "Arcane",
+                            "bestAmount": 1603.6791996127,
+                            "rankTooltip": null,
+                            "bestRank": {
+                                "rank_id": 7422788,
+                                "class": 4,
+                                "spec": 1,
+                                "per_second_amount": 1603.6791996127,
+                                "ilvl": 130,
+                                "fight_metadata": 996920
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

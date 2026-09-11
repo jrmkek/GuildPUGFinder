@@ -1,0 +1,271 @@
+// WarcraftLogsClient.cs
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+namespace GuildPUGFinderApp;
+
+public record BossParse(string EncounterName, double RankPercent);
+
+public record CharacterResult(
+    string Name,
+    bool Found,
+    double? BestParsePercent,
+    double? MedianParsePercent,
+    double? AverageItemLevel,
+    string? Spec,
+    int? ClassId,
+    string? ClassName,
+    List<BossParse> PerBoss,
+    string? RawError
+);
+
+public class WarcraftLogsClient
+{
+    private readonly HttpClient _http = new();
+    private readonly string _tokenUrl;
+    private readonly string _apiUrl;
+    private readonly string _clientId;
+    private readonly string _clientSecret;
+    private string? _accessToken;
+    private Dictionary<int, string>? _classNamesById;
+
+    public WarcraftLogsClient(string clientId, string clientSecret, string site = "fresh")
+    {
+        _clientId = clientId;
+        _clientSecret = clientSecret;
+
+        string baseDomain = site switch
+        {
+            "classic" => "classic.warcraftlogs.com",
+            "www" or "retail" => "www.warcraftlogs.com",
+            _ => "fresh.warcraftlogs.com"
+        };
+
+        _tokenUrl = $"https://{baseDomain}/oauth/token";
+        _apiUrl = $"https://{baseDomain}/api/v2/client";
+    }
+
+    public async Task AuthenticateAsync()
+    {
+        var authBytes = System.Text.Encoding.ASCII.GetBytes($"{_clientId}:{_clientSecret}");
+        var authHeader = Convert.ToBase64String(authBytes);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, _tokenUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", authHeader);
+        request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials"
+        });
+
+        var response = await _http.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"Token request failed ({(int)response.StatusCode}): {body}");
+
+        using var doc = JsonDocument.Parse(body);
+        _accessToken = doc.RootElement.GetProperty("access_token").GetString();
+    }
+
+    // Fetches the id -> name class mapping directly from WCL's own schema,
+    // rather than trusting a hardcoded table that may not match this site's
+    // enum (retail, classic, and fresh have shown small inconsistencies
+    // elsewhere in this API, so don't assume - ask it directly).
+    // Degrades gracefully (empty dict) if this query's shape turns out to be
+    // wrong on this site, rather than crashing the whole run.
+    public async Task<Dictionary<int, string>> GetClassNamesAsync()
+    {
+        if (_classNamesById != null) return _classNamesById;
+        _classNamesById = new Dictionary<int, string>();
+
+        if (_accessToken == null)
+            throw new InvalidOperationException("Call AuthenticateAsync() first.");
+
+        const string query = @"
+query GetClasses {
+  gameData {
+    classes {
+      id
+      name
+    }
+  }
+}";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+            request.Content = JsonContent.Create(new { query });
+
+            var response = await _http.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("errors", out _)) return _classNamesById; // degrade gracefully
+
+            var classes = root.GetProperty("data").GetProperty("gameData").GetProperty("classes");
+            foreach (var c in classes.EnumerateArray())
+            {
+                int id = c.GetProperty("id").GetInt32();
+                string name = c.GetProperty("name").GetString() ?? "";
+                _classNamesById[id] = name;
+            }
+        }
+        catch
+        {
+            // leave _classNamesById empty; class filtering degrades to
+            // "unknown" rather than crashing the run.
+        }
+
+        return _classNamesById;
+    }
+
+    public async Task<(double LimitPerHour, double PointsSpent, int ResetInSeconds)?> GetRateLimitAsync()
+    {
+        if (_accessToken == null)
+            throw new InvalidOperationException("Call AuthenticateAsync() first.");
+
+        const string query = @"
+query GetRateLimit {
+  rateLimitData {
+    limitPerHour
+    pointsSpentThisHour
+    pointsResetIn
+  }
+}";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+            request.Content = JsonContent.Create(new { query });
+
+            var response = await _http.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("errors", out _)) return null;
+
+            var rl = root.GetProperty("data").GetProperty("rateLimitData");
+            return (
+                rl.GetProperty("limitPerHour").GetDouble(),
+                rl.GetProperty("pointsSpentThisHour").GetDouble(),
+                rl.GetProperty("pointsResetIn").GetInt32()
+            );
+        }
+        catch
+        {
+            return null; // degrade gracefully - just skip the pre-flight check
+        }
+    }
+
+    public async Task<CharacterResult> GetCharacterAsync(string name, string serverSlug, string serverRegion, int? partition = null)
+    {
+        if (_accessToken == null)
+            throw new InvalidOperationException("Call AuthenticateAsync() first.");
+
+        var classNames = await GetClassNamesAsync();
+
+        // partition is WCL's content-phase segmentation (e.g. P1/P2/P3 within
+        // a raid tier). We don't yet know for certain which number maps to
+        // which phase on this site - pass through whatever the user enters
+        // and let them confirm by comparing results. null omits the
+        // argument entirely, which WCL treats as "all-time aggregate"
+        // (confirmed: an unfiltered query returned partition: -1 in the
+        // response, meaning "no filter applied").
+        string query = partition.HasValue ? @"
+query GetCharacter($name: String!, $serverSlug: String!, $serverRegion: String!, $partition: Int!) {
+  characterData {
+    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
+      name
+      classID
+      zoneRankings(partition: $partition)
+    }
+  }
+}" : @"
+query GetCharacter($name: String!, $serverSlug: String!, $serverRegion: String!) {
+  characterData {
+    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
+      name
+      classID
+      zoneRankings
+    }
+  }
+}";
+
+        object variables = partition.HasValue
+            ? new { name, serverSlug, serverRegion, partition = partition.Value }
+            : new { name, serverSlug, serverRegion };
+
+        var payload = new { query, variables };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        request.Content = JsonContent.Create(payload);
+
+        var response = await _http.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            return new CharacterResult(name, false, null, null, null, null, null, null, new(), $"HTTP {(int)response.StatusCode}: {body}");
+
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+
+        if (root.TryGetProperty("errors", out var errors))
+            return new CharacterResult(name, false, null, null, null, null, null, null, new(), errors.ToString());
+
+        var character = root.GetProperty("data").GetProperty("characterData").GetProperty("character");
+        if (character.ValueKind == JsonValueKind.Null)
+            return new CharacterResult(name, false, null, null, null, null, null, null, new(), "character not found (null)");
+
+        int? classId = character.TryGetProperty("classID", out var cid) && cid.ValueKind == JsonValueKind.Number
+            ? cid.GetInt32() : null;
+        string? className = classId.HasValue && classNames.TryGetValue(classId.Value, out var cn) ? cn : null;
+
+        if (!character.TryGetProperty("zoneRankings", out var zoneRankings) || zoneRankings.ValueKind == JsonValueKind.Null)
+        {
+            var raw = character.GetRawText();
+            if (raw.Length > 500) raw = raw[..500] + "...(truncated)";
+            return new CharacterResult(name, false, null, null, null, null, classId, className, new(), $"no zoneRankings - raw character JSON: {raw}");
+        }
+
+        double? best = zoneRankings.TryGetProperty("bestPerformanceAverage", out var b) && b.ValueKind == JsonValueKind.Number
+            ? b.GetDouble() : null;
+        double? median = zoneRankings.TryGetProperty("medianPerformanceAverage", out var m) && m.ValueKind == JsonValueKind.Number
+            ? m.GetDouble() : null;
+
+        double? avgIlvl = null;
+        string? spec = null;
+        var perBoss = new List<BossParse>();
+
+        if (zoneRankings.TryGetProperty("rankings", out var rankings) && rankings.ValueKind == JsonValueKind.Array)
+        {
+            var ilvls = new List<double>();
+            foreach (var ranking in rankings.EnumerateArray())
+            {
+                if (spec == null && ranking.TryGetProperty("spec", out var specEl) && specEl.ValueKind == JsonValueKind.String)
+                    spec = specEl.GetString();
+
+                if (ranking.TryGetProperty("bestRank", out var bestRank) && bestRank.ValueKind == JsonValueKind.Object
+                    && bestRank.TryGetProperty("ilvl", out var ilvlEl) && ilvlEl.ValueKind == JsonValueKind.Number)
+                {
+                    ilvls.Add(ilvlEl.GetDouble());
+                }
+
+                if (ranking.TryGetProperty("encounter", out var encEl) && encEl.ValueKind == JsonValueKind.Object
+                    && encEl.TryGetProperty("name", out var encName)
+                    && ranking.TryGetProperty("rankPercent", out var rp) && rp.ValueKind == JsonValueKind.Number)
+                {
+                    perBoss.Add(new BossParse(encName.GetString() ?? "?", rp.GetDouble()));
+                }
+            }
+            if (ilvls.Count > 0) avgIlvl = ilvls.Average();
+        }
+
+        return new CharacterResult(name, true, best, median, avgIlvl, spec, classId, className, perBoss, null);
+    }
+}

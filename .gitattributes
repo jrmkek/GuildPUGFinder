@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+*.ps1   text eol=crlf
+*.sln   text eol=crlf
+*.csproj text eol=crlf
+*.xaml  text eol=crlf
+
+*.zip   binary
+*.dll   binary
+*.exe   binary
+*.pdb   binary

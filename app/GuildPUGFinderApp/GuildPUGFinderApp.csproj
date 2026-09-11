@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>GuildPUGFinderApp</RootNamespace>
+    <AssemblyName>GuildPUGFinderApp</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>GuildPUGFinder</Product>
+    <Description>Companion desktop app that screens WoW Group Finder candidates against WarcraftLogs parses and item level.</Description>
+    <Version>0.1.0</Version>
+    <Copyright>Copyright (c) 2026 GuildPUGFinder contributors</Copyright>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- config.json holds real credentials, is gitignored, and may not exist
+         on a fresh clone - hence the Exists() guard. config.example.json is
+         the committed template and always ships next to the binary. -->
+    <None Update="config.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('config.json')" />
+    <None Update="config.example.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

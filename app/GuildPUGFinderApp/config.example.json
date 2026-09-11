@@ -1,0 +1,16 @@
+{
+  "_comment": "Copy this file to config.json and fill in your own values. config.json is gitignored and never committed.",
+
+  "ClientId": "YOUR_WARCRAFTLOGS_CLIENT_ID",
+  "ClientSecret": "YOUR_WARCRAFTLOGS_CLIENT_SECRET",
+
+  "_Site": "Which WarcraftLogs site to query: 'fresh', 'classic', or 'retail'.",
+  "Site": "fresh",
+
+  "_ServerSlug": "Your realm in WCL's slug form, lowercase and hyphenated (e.g. 'spineshatter').",
+  "ServerSlug": "your-realm",
+  "ServerRegion": "eu",
+
+  "_SavedVariablesPath": "Full path to the addon's SavedVariables file. Replace <AccountName> with the folder name under WTF\\Account.",
+  "SavedVariablesPath": "C:\\Program Files (x86)\\World of Warcraft\\_anniversary_\\WTF\\Account\\<AccountName>\\SavedVariables\\GuildPUGFinder.lua"
+}

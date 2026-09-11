@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+publish/
+dist/
+*.user
+*.suo
+
+# Local credentials - config.example.json is the committed template.
+# Never commit a real WarcraftLogs client secret.
+app/GuildPUGFinderApp/config.json
+config.json
+
+# IDE
+.vs/
+.idea/
+*.userprefs
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Archives / scratch
+*.zip
+*.log
