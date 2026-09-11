@@ -162,43 +162,95 @@ query GetRateLimit {
         }
     }
 
-    public async Task<CharacterResult> GetCharacterAsync(string name, string serverSlug, string serverRegion, int? partition = null)
+    // Fetches the raid tier list directly from WCL (id + name), so the user
+    // can find the right zoneID for P1 (Karazhan/Gruul/Mag), P2 (SSC/TK),
+    // etc without guessing. Schema/field names here are a best guess at
+    // WCL's typical "worldData.zones" shape - unverified until tested live.
+    public async Task<(List<(int Id, string Name)> Zones, string? Error)> GetZonesAsync()
+    {
+        if (_accessToken == null)
+            throw new InvalidOperationException("Call AuthenticateAsync() first.");
+
+        const string query = @"
+query GetZones {
+  worldData {
+    zones {
+      id
+      name
+    }
+  }
+}";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+            request.Content = JsonContent.Create(new { query });
+
+            var response = await _http.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("errors", out var errors))
+                return (new(), errors.ToString());
+
+            var zones = new List<(int, string)>();
+            var zonesEl = root.GetProperty("data").GetProperty("worldData").GetProperty("zones");
+            foreach (var z in zonesEl.EnumerateArray())
+            {
+                zones.Add((z.GetProperty("id").GetInt32(), z.GetProperty("name").GetString() ?? ""));
+            }
+            return (zones, null);
+        }
+        catch (Exception ex)
+        {
+            return (new(), ex.Message);
+        }
+    }
+
+    public async Task<CharacterResult> GetCharacterAsync(string name, string serverSlug, string serverRegion, int? partition = null, int? zoneId = null)
     {
         if (_accessToken == null)
             throw new InvalidOperationException("Call AuthenticateAsync() first.");
 
         var classNames = await GetClassNamesAsync();
 
-        // partition is WCL's content-phase segmentation (e.g. P1/P2/P3 within
-        // a raid tier). We don't yet know for certain which number maps to
-        // which phase on this site - pass through whatever the user enters
-        // and let them confirm by comparing results. null omits the
-        // argument entirely, which WCL treats as "all-time aggregate"
-        // (confirmed: an unfiltered query returned partition: -1 in the
-        // response, meaning "no filter applied").
-        string query = partition.HasValue ? @"
-query GetCharacter($name: String!, $serverSlug: String!, $serverRegion: String!, $partition: Int!) {
-  characterData {
-    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
-      name
-      classID
-      zoneRankings(partition: $partition)
-    }
-  }
-}" : @"
-query GetCharacter($name: String!, $serverSlug: String!, $serverRegion: String!) {
-  characterData {
-    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
-      name
-      classID
-      zoneRankings
-    }
-  }
-}";
+        // partition = content-phase segmentation within one raid tier.
+        // zoneId = which raid tier entirely (Karazhan vs SSC/TK vs BT/Hyjal
+        // etc - these are different WCL "zones", found via GetZonesAsync).
+        // Both are optional and combinable; omitting both matches the
+        // original all-time-aggregate-on-latest-zone behavior.
+        var variables = new Dictionary<string, object> { ["name"] = name, ["serverSlug"] = serverSlug, ["serverRegion"] = serverRegion };
+        var varDecls = new List<string> { "$name: String!", "$serverSlug: String!", "$serverRegion: String!" };
+        var zoneRankingsArgs = new List<string>();
 
-        object variables = partition.HasValue
-            ? new { name, serverSlug, serverRegion, partition = partition.Value }
-            : new { name, serverSlug, serverRegion };
+        if (partition.HasValue)
+        {
+            variables["partition"] = partition.Value;
+            varDecls.Add("$partition: Int!");
+            zoneRankingsArgs.Add("partition: $partition");
+        }
+        if (zoneId.HasValue)
+        {
+            variables["zoneID"] = zoneId.Value;
+            varDecls.Add("$zoneID: Int!");
+            zoneRankingsArgs.Add("zoneID: $zoneID");
+        }
+
+        string zoneRankingsField = zoneRankingsArgs.Count > 0
+            ? $"zoneRankings({string.Join(", ", zoneRankingsArgs)})"
+            : "zoneRankings";
+
+        string query = $@"
+query GetCharacter({string.Join(", ", varDecls)}) {{
+  characterData {{
+    character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {{
+      name
+      classID
+      {zoneRankingsField}
+    }}
+  }}
+}}";
 
         var payload = new { query, variables };
 

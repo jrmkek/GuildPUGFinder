@@ -3,7 +3,6 @@
 // Per-run tunable filters (thresholds, classes, per-boss toggle) live in
 // RunOptions instead, since those are meant to be changed often from the UI.
 
-
 namespace GuildPUGFinderApp;
 
 public class Config

@@ -96,8 +96,8 @@ credential, and anyone holding it can spend your API rate limit.
 ### 4. Build and run
 
 ```powershell
-./build.ps1            # publishes to dist/
-./build.ps1 -Run       # publish, then launch
+powershell -ExecutionPolicy Bypass -File .\build.ps1            # publishes to dist/
+powershell -ExecutionPolicy Bypass -File .\build.ps1       # publish, then launch
 ```
 
 Or straight from the SDK:

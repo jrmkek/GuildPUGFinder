@@ -69,18 +69,35 @@ public partial class MainWindow : Window
 
         if (!File.Exists(path))
         {
-            StatusText.Text = "config.json not found next to the app. Create it with your WCL credentials, realm, and SavedVariables path.";
+            StatusText.Text = "config.json not found next to the app.";
+            MessageBox.Show(this,
+                "config.json wasn't found next to the app.\n\n" +
+                "Copy config.example.json to config.json in this same folder, then fill in your " +
+                "WarcraftLogs Client ID/Secret, realm, and SavedVariables path.\n\n" +
+                "Nothing will work (Run, Watch, List Raid Tiers) until this exists.",
+                "Missing config.json", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         try
         {
             _config = JsonSerializer.Deserialize<Config>(File.ReadAllText(path));
+            if (_config == null || string.IsNullOrWhiteSpace(_config.ClientId) || _config.ClientId.StartsWith("PASTE_"))
+            {
+                StatusText.Text = "config.json found but credentials look unfilled.";
+                MessageBox.Show(this,
+                    "config.json was found, but ClientId still looks like the placeholder value.\n\n" +
+                    "Open config.json and paste in your real WarcraftLogs Client ID and Secret.",
+                    "config.json not filled in", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             StatusText.Text = "Config loaded. Ready.";
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Failed to read config.json: {ex.Message}";
+            MessageBox.Show(this, $"config.json exists but couldn't be parsed:\n\n{ex.Message}",
+                "Invalid config.json", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -216,6 +233,17 @@ public partial class MainWindow : Window
             partition = p;
         }
 
+        int? zoneId = null;
+        if (!string.IsNullOrWhiteSpace(ZoneIdBox.Text))
+        {
+            if (!int.TryParse(ZoneIdBox.Text, out var z))
+            {
+                error = "Zone ID must be a whole number, or left blank.";
+                return null;
+            }
+            zoneId = z;
+        }
+
         var allowedClasses = new HashSet<string>();
         foreach (var (box, name) in new (System.Windows.Controls.CheckBox, string)[]
         {
@@ -235,7 +263,45 @@ public partial class MainWindow : Window
             UsePerBossParse = UsePerBossCheck.IsChecked == true,
             MinPerBossParsePercent = minPerBoss,
             Partition = partition,
+            ZoneId = zoneId,
         };
+    }
+
+    private async void ListZonesButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_config == null)
+        {
+            StatusText.Text = "No valid config.json loaded - fix that first.";
+            return;
+        }
+
+        ListZonesButton.IsEnabled = false;
+        StatusText.Text = "Fetching zone list...";
+        try
+        {
+            var client = new WarcraftLogsClient(_config.ClientId, _config.ClientSecret, _config.Site);
+            await client.AuthenticateAsync();
+            var (zones, error) = await client.GetZonesAsync();
+
+            if (error != null)
+            {
+                StatusText.Text = $"Couldn't fetch zone list: {error}";
+                return;
+            }
+
+            string list = string.Join("\n", zones.Select(z => $"{z.Id}  -  {z.Name}"));
+            MessageBox.Show(this, list, "Raid tiers (id - name) - type the id you want into Zone ID",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            StatusText.Text = $"Found {zones.Count} zone(s). Pick the id for the tier you want.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Error fetching zones: {ex.Message}";
+        }
+        finally
+        {
+            ListZonesButton.IsEnabled = true;
+        }
     }
 
     private async void RunButton_Click(object sender, RoutedEventArgs e)

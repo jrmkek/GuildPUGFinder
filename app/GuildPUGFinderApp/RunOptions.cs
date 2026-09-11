@@ -2,7 +2,6 @@
 // Tunable filters for one run of the pipeline - these are the values the
 // WPF window lets the user change before hitting "Run".
 
-
 namespace GuildPUGFinderApp;
 
 public class RunOptions
@@ -23,6 +22,11 @@ public class RunOptions
     // content phase/partition - the exact number-to-phase mapping needs
     // confirming live (see UI note).
     public int? Partition { get; set; } = null;
+
+    // null = WCL's default (currently latest/BT+Hyjal). Set to target a
+    // specific raid tier (Karazhan, SSC/TK, etc) - use "List Raid Tiers" in
+    // the UI to find the right id.
+    public int? ZoneId { get; set; } = null;
 }
 
 public enum CandidateStatus { Pass, Fail, NoData, NotFound, Error }

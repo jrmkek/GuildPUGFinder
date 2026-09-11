@@ -1,68 +1,58 @@
-<#
-.SYNOPSIS
-    Builds and publishes the GuildPUGFinder companion app, and stages the
-    addon folder for copying into AddOns/.
+# build.ps1
+# Builds a self-contained, single-file GuildPUGFinderApp.exe into dist/,
+# ready to hand to the GM. Works regardless of where you run it from.
+#
+# Usage:
+#   .\build.ps1
 
-.EXAMPLE
-    ./build.ps1
-    ./build.ps1 -Configuration Debug
-    ./build.ps1 -Run
-#>
-[CmdletBinding()]
-param(
-    [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Release',
+$ErrorActionPreference = "Stop"
 
-    # Produce a single .exe that does not need .NET installed on the machine.
-    [switch]$SelfContained,
+# $PSScriptRoot is this script's own folder (repo root), so this works no
+# matter what directory you're in when you run it.
+$repoRoot = $PSScriptRoot
+$projectPath = Join-Path $repoRoot "app\GuildPUGFinderApp\GuildPUGFinderApp.csproj"
+$distPath = Join-Path $repoRoot "dist"
 
-    # Launch the app once the publish succeeds.
-    [switch]$Run
-)
-
-$ErrorActionPreference = 'Stop'
-$root = $PSScriptRoot
-$project = Join-Path $root 'app/GuildPUGFinderApp/GuildPUGFinderApp.csproj'
-$dist = Join-Path $root 'dist'
-
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw "The .NET SDK was not found on PATH. Install .NET 8 from https://dotnet.microsoft.com/download/dotnet/8.0"
+if (-not (Test-Path $projectPath)) {
+    Write-Error "Couldn't find project file at: $projectPath"
+    exit 1
 }
 
-Write-Host "Publishing $Configuration -> $dist" -ForegroundColor Cyan
-
-$publishArgs = @(
-    'publish', $project,
-    '-c', $Configuration,
-    '-r', 'win-x64',
-    '-o', $dist,
-    '--nologo'
-)
-if ($SelfContained) {
-    $publishArgs += @('--self-contained', 'true', '-p:PublishSingleFile=true')
-} else {
-    $publishArgs += @('--self-contained', 'false')
+Write-Host "Cleaning old dist folder..." -ForegroundColor Cyan
+if (Test-Path $distPath) {
+    Remove-Item -Recurse -Force $distPath
 }
 
-& dotnet @publishArgs
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
+Write-Host "Publishing release build..." -ForegroundColor Cyan
+dotnet publish $projectPath `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -p:PublishSingleFile=true `
+    -o $distPath
 
-# A user's real config.json is gitignored and lives next to the sources, so
-# carry it over to the publish folder; otherwise seed the template so a first
-# run has something to edit rather than an error.
-$srcConfig = Join-Path $root 'app/GuildPUGFinderApp/config.json'
-$distConfig = Join-Path $dist 'config.json'
-if ((Test-Path $srcConfig) -and -not (Test-Path $distConfig)) {
-    Copy-Item $srcConfig $distConfig
-} elseif (-not (Test-Path $distConfig)) {
-    Copy-Item (Join-Path $root 'app/GuildPUGFinderApp/config.example.json') $distConfig
-    Write-Warning "No config.json found. Seeded dist/config.json from the template - fill in your WarcraftLogs credentials before running."
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Build failed - see errors above."
+    exit 1
 }
 
-Write-Host "`nDone." -ForegroundColor Green
-Write-Host "  App:   $dist\GuildPUGFinderApp.exe"
-Write-Host "  Addon: copy 'addon\GuildPUGFinder' into World of Warcraft\_anniversary_\Interface\AddOns\"
-
-if ($Run) {
-    Start-Process (Join-Path $dist 'GuildPUGFinderApp.exe')
+# config.json (real credentials) is deliberately NOT copied here - only the
+# example template should ever ship. The GM needs to create their own
+# config.json in dist/ from config.example.json before running the app.
+$examplePath = Join-Path $repoRoot "app\GuildPUGFinderApp\config.example.json"
+if (Test-Path $examplePath) {
+    Copy-Item $examplePath -Destination $distPath -Force
 }
+
+# Remove a real config.json if the csproj's CopyToOutputDirectory rule
+# happened to pull one in - dist/ is meant to be shareable, so a live
+# secret should never end up in there.
+$realConfigInDist = Join-Path $distPath "config.json"
+if (Test-Path $realConfigInDist) {
+    Remove-Item $realConfigInDist -Force
+    Write-Host "Removed config.json from dist/ (only config.example.json ships)." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "Done. Distributable build is in: $distPath" -ForegroundColor Green
+Write-Host "Before handing this to the GM: copy config.example.json to config.json in that folder and fill in real credentials." -ForegroundColor Green

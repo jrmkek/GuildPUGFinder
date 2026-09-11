@@ -66,7 +66,7 @@ public class PipelineRunner
                 continue; // skip entirely - no query, no row
             }
 
-            var result = await client.GetCharacterAsync(name, _config.ServerSlug, _config.ServerRegion, options.Partition);
+            var result = await client.GetCharacterAsync(name, _config.ServerSlug, _config.ServerRegion, options.Partition, options.ZoneId);
 
             // Prefer the addon-captured class (instant, doesn't depend on
             // the WCL query succeeding) over WCL's own classID-resolved
