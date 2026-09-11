@@ -32,9 +32,17 @@ public class CandidateRowView
     }
 }
 
+public class ZoneOption
+{
+    public int? Id { get; }
+    public string Name { get; }
+    public ZoneOption(int? id, string name) { Id = id; Name = name; }
+}
+
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<CandidateRowView> _rows = new();
+    private readonly ObservableCollection<ZoneOption> _zoneOptions = new() { new ZoneOption(null, "Latest tier (default)") };
     private readonly HashSet<string> _seenClasses = new();
     private Config? _config;
 
@@ -47,7 +55,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ResultsGrid.ItemsSource = _rows;
+        RaidTierCombo.ItemsSource = _zoneOptions;
+        RaidTierCombo.SelectedIndex = 0;
         LoadConfig();
+        _ = LoadZoneOptionsAsync(); // fire-and-forget, non-blocking
 
         // Debounce: WoW's SavedVariables write (plus antivirus/OS file
         // events) can fire several Changed events for one actual save, and
@@ -99,6 +110,22 @@ public partial class MainWindow : Window
             MessageBox.Show(this, $"config.json exists but couldn't be parsed:\n\n{ex.Message}",
                 "Invalid config.json", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private async Task LoadZoneOptionsAsync()
+    {
+        // worldData.zones (the documented approach) returns a DIFFERENT id
+        // space than what zoneRankings(zoneID:) actually expects on this
+        // Fresh site - confirmed by empirical probing (see chat history):
+        // worldData.zones said "BT/Hyjal" = 1011, but zoneRankings only
+        // returns real data for that tier at id 1060. So instead of trusting
+        // the live "official" lookup, use ids confirmed by directly probing
+        // zoneRankings and matching boss lists against known raid rosters.
+        _zoneOptions.Add(new ZoneOption(1047, "Karazhan"));
+        _zoneOptions.Add(new ZoneOption(1048, "Gruul's Lair + Magtheridon's Lair (P1)"));
+        _zoneOptions.Add(new ZoneOption(1056, "Serpentshrine Cavern + Tempest Keep (P2)"));
+        _zoneOptions.Add(new ZoneOption(1060, "Black Temple + Mount Hyjal (P3/current)"));
+        await Task.CompletedTask;
     }
 
     private void ShowPerBossCheck_Changed(object sender, RoutedEventArgs e)
@@ -222,28 +249,6 @@ public partial class MainWindow : Window
             return null;
         }
 
-        int? partition = null;
-        if (!string.IsNullOrWhiteSpace(PartitionBox.Text))
-        {
-            if (!int.TryParse(PartitionBox.Text, out var p))
-            {
-                error = "Partition must be a whole number, or left blank.";
-                return null;
-            }
-            partition = p;
-        }
-
-        int? zoneId = null;
-        if (!string.IsNullOrWhiteSpace(ZoneIdBox.Text))
-        {
-            if (!int.TryParse(ZoneIdBox.Text, out var z))
-            {
-                error = "Zone ID must be a whole number, or left blank.";
-                return null;
-            }
-            zoneId = z;
-        }
-
         var allowedClasses = new HashSet<string>();
         foreach (var (box, name) in new (System.Windows.Controls.CheckBox, string)[]
         {
@@ -255,6 +260,8 @@ public partial class MainWindow : Window
             if (box.IsChecked == true) allowedClasses.Add(name);
         }
 
+        var selectedZone = RaidTierCombo.SelectedItem as ZoneOption;
+
         return new RunOptions
         {
             MinBestParsePercent = minParse,
@@ -262,46 +269,8 @@ public partial class MainWindow : Window
             AllowedClasses = allowedClasses,
             UsePerBossParse = UsePerBossCheck.IsChecked == true,
             MinPerBossParsePercent = minPerBoss,
-            Partition = partition,
-            ZoneId = zoneId,
+            ZoneId = selectedZone?.Id,
         };
-    }
-
-    private async void ListZonesButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_config == null)
-        {
-            StatusText.Text = "No valid config.json loaded - fix that first.";
-            return;
-        }
-
-        ListZonesButton.IsEnabled = false;
-        StatusText.Text = "Fetching zone list...";
-        try
-        {
-            var client = new WarcraftLogsClient(_config.ClientId, _config.ClientSecret, _config.Site);
-            await client.AuthenticateAsync();
-            var (zones, error) = await client.GetZonesAsync();
-
-            if (error != null)
-            {
-                StatusText.Text = $"Couldn't fetch zone list: {error}";
-                return;
-            }
-
-            string list = string.Join("\n", zones.Select(z => $"{z.Id}  -  {z.Name}"));
-            MessageBox.Show(this, list, "Raid tiers (id - name) - type the id you want into Zone ID",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            StatusText.Text = $"Found {zones.Count} zone(s). Pick the id for the tier you want.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Error fetching zones: {ex.Message}";
-        }
-        finally
-        {
-            ListZonesButton.IsEnabled = true;
-        }
     }
 
     private async void RunButton_Click(object sender, RoutedEventArgs e)

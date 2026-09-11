@@ -21,12 +21,8 @@
 
             <CheckBox x:Name="ShowPerBossCheck" Content="Show per-boss parses in table" Margin="0,0,0,14" Checked="ShowPerBossCheck_Changed" Unchecked="ShowPerBossCheck_Changed"/>
 
-            <TextBlock Text="Partition (blank = all-time)" FontWeight="Bold"/>
-            <TextBox x:Name="PartitionBox" Text="" Margin="0,2,0,10"/>
-
-            <TextBlock Text="Zone ID (blank = latest tier)" FontWeight="Bold"/>
-            <TextBox x:Name="ZoneIdBox" Text="" Margin="0,2,0,4"/>
-            <Button x:Name="ListZonesButton" Content="List Raid Tiers..." Padding="0,4" Margin="0,0,0,14" Click="ListZonesButton_Click"/>
+            <TextBlock Text="Raid tier" FontWeight="Bold"/>
+            <ComboBox x:Name="RaidTierCombo" Margin="0,2,0,14" DisplayMemberPath="Name"/>
 
             <TextBlock Text="Classes (none checked = any)" FontWeight="Bold" Margin="0,0,0,4"/>
             <CheckBox x:Name="ClassWarrior" Content="Warrior"/>
