@@ -27,6 +27,19 @@ public class RunOptions
     // specific raid tier (Karazhan, SSC/TK, etc) - use "List Raid Tiers" in
     // the UI to find the right id.
     public int? ZoneId { get; set; } = null;
+
+    // Which parse categories to actually query. Unchecking one skips that
+    // query entirely (saves rate-limit budget) rather than just hiding it
+    // from the display.
+    public bool QueryOverall { get; set; } = true;
+    public bool QueryDps { get; set; } = true;
+    public bool QueryHeal { get; set; } = true;
+    public bool QueryTank { get; set; } = true;
+
+    // Names to skip entirely - no query, no row, regardless of what a
+    // fresh /pugscan + /reload brings in. Persists for the life of the
+    // app (set from the UI's right-click blacklist action).
+    public HashSet<string> BlacklistedNames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 public enum CandidateStatus { Pass, Fail, NoData, NotFound, Error }
@@ -34,7 +47,10 @@ public enum CandidateStatus { Pass, Fail, NoData, NotFound, Error }
 public record CandidateRow(
     string Name,
     CandidateStatus Status,
-    double? BestParsePercent,
+    double? OverallParsePercent,
+    double? DpsParsePercent,
+    double? HealParsePercent,
+    double? TankParsePercent,
     double? AverageItemLevel,
     string? Spec,
     string? ClassName,

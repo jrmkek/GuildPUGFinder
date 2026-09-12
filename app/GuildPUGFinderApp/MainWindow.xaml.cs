@@ -12,7 +12,10 @@ public class CandidateRowView
 {
     public string Name { get; }
     public CandidateStatus Status { get; }
-    public double? BestParsePercent { get; }
+    public double? OverallParsePercent { get; }
+    public double? DpsParsePercent { get; }
+    public double? HealParsePercent { get; }
+    public double? TankParsePercent { get; }
     public double? AverageItemLevel { get; }
     public string? Spec { get; }
     public string? ClassName { get; }
@@ -23,7 +26,10 @@ public class CandidateRowView
     {
         Name = row.Name;
         Status = row.Status;
-        BestParsePercent = row.BestParsePercent;
+        OverallParsePercent = row.OverallParsePercent;
+        DpsParsePercent = row.DpsParsePercent;
+        HealParsePercent = row.HealParsePercent;
+        TankParsePercent = row.TankParsePercent;
         AverageItemLevel = row.AverageItemLevel;
         Spec = row.Spec;
         ClassName = row.ClassName;
@@ -44,6 +50,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<CandidateRowView> _rows = new();
     private readonly ObservableCollection<ZoneOption> _zoneOptions = new() { new ZoneOption(null, "Latest tier (default)") };
     private readonly HashSet<string> _seenClasses = new();
+    private readonly Dictionary<string, DateTime> _blacklist = new(StringComparer.OrdinalIgnoreCase);
     private Config? _config;
 
     private FileSystemWatcher? _watcher;
@@ -262,6 +269,17 @@ public partial class MainWindow : Window
 
         var selectedZone = RaidTierCombo.SelectedItem as ZoneOption;
 
+        bool queryOverall = QueryOverallCheck.IsChecked == true;
+        bool queryDps = QueryDpsCheck.IsChecked == true;
+        bool queryHeal = QueryHealCheck.IsChecked == true;
+        bool queryTank = QueryTankCheck.IsChecked == true;
+
+        if (!queryOverall && !queryDps && !queryHeal && !queryTank)
+        {
+            error = "Check at least one parse category to query.";
+            return null;
+        }
+
         return new RunOptions
         {
             MinBestParsePercent = minParse,
@@ -270,7 +288,62 @@ public partial class MainWindow : Window
             UsePerBossParse = UsePerBossCheck.IsChecked == true,
             MinPerBossParsePercent = minPerBoss,
             ZoneId = selectedZone?.Id,
+            QueryOverall = queryOverall,
+            QueryDps = queryDps,
+            QueryHeal = queryHeal,
+            QueryTank = queryTank,
+            BlacklistedNames = GetActiveBlacklist(),
         };
+    }
+
+    private static readonly TimeSpan BlacklistTtl = TimeSpan.FromDays(1);
+
+    // Removes entries older than 24h and returns the still-active names.
+    // Called right before every run so expiry is always up to date.
+    private HashSet<string> GetActiveBlacklist()
+    {
+        var expired = _blacklist.Where(kv => DateTime.UtcNow - kv.Value > BlacklistTtl).Select(kv => kv.Key).ToList();
+        foreach (var name in expired) _blacklist.Remove(name);
+        return new HashSet<string>(_blacklist.Keys, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void BlacklistSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = ResultsGrid.SelectedItems.Cast<CandidateRowView>().ToList();
+        if (selected.Count == 0) return;
+
+        foreach (var row in selected)
+        {
+            _blacklist[row.Name] = DateTime.UtcNow;
+            _rows.Remove(row);
+        }
+        StatusText.Text = $"Blacklisted {selected.Count} name(s) for 24h. They'll be skipped on every run until then.";
+    }
+
+    private void ViewBlacklistButton_Click(object sender, RoutedEventArgs e)
+    {
+        GetActiveBlacklist(); // prune expired before showing
+        var window = new BlacklistWindow(_blacklist) { Owner = this };
+        window.ShowDialog();
+    }
+
+    private void CopyWhispers_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = ResultsGrid.SelectedItems.Cast<CandidateRowView>().ToList();
+        if (selected.Count == 0) return;
+
+        string template = WhisperTemplateBox.Text;
+        string text = string.Join("\n", selected.Select(r => $"/w {r.Name} {template}"));
+
+        try
+        {
+            Clipboard.SetText(text);
+            StatusText.Text = $"Copied {selected.Count} whisper command(s) to clipboard.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Couldn't copy to clipboard: {ex.Message}";
+        }
     }
 
     private async void RunButton_Click(object sender, RoutedEventArgs e)
@@ -278,13 +351,14 @@ public partial class MainWindow : Window
         var options = BuildOptionsFromUi(out var error);
         if (options == null)
         {
+            _rows.Clear();
             StatusText.Text = error;
             return;
         }
-        await RunPipelineAsync(options);
+        await RunPipelineAsync(options, forceFresh: true);
     }
 
-    private async Task RunPipelineAsync(RunOptions options)
+    private async Task RunPipelineAsync(RunOptions options, bool forceFresh = false)
     {
         if (_config == null)
         {
@@ -314,7 +388,7 @@ public partial class MainWindow : Window
                     if (matchesClassFilter)
                         _rows.Add(new CandidateRowView(row));
                 });
-            });
+            }, forceFresh);
 
             int passCount = results.Count(r => r.Status == CandidateStatus.Pass);
             StatusText.Text = $"Done. {passCount} of {results.Count} eligible. Written back to SavedVariables - /reload in-game to pick them up.";

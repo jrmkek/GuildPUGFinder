@@ -18,7 +18,8 @@ public record CharacterResult(
     int? ClassId,
     string? ClassName,
     List<BossParse> PerBoss,
-    string? RawError
+    string? RawError,
+    string? RawResponseJson = null
 );
 
 public class WarcraftLogsClient
@@ -208,7 +209,10 @@ query GetZones {
         }
     }
 
-    public async Task<CharacterResult> GetCharacterAsync(string name, string serverSlug, string serverRegion, int? partition = null, int? zoneId = null)
+    // role: "DPS" | "Healer" | "Tank" | null (null = WCL's own default).
+    // Added so callers can query the same character under each role and
+    // see which one(s) actually have real logged data.
+    public async Task<CharacterResult> GetCharacterAsync(string name, string serverSlug, string serverRegion, int? partition = null, int? zoneId = null, string? role = null)
     {
         if (_accessToken == null)
             throw new InvalidOperationException("Call AuthenticateAsync() first.");
@@ -236,6 +240,12 @@ query GetZones {
             varDecls.Add("$zoneID: Int!");
             zoneRankingsArgs.Add("zoneID: $zoneID");
         }
+        if (!string.IsNullOrEmpty(role))
+        {
+            variables["role"] = role;
+            varDecls.Add("$role: RoleType!");
+            zoneRankingsArgs.Add("role: $role");
+        }
 
         string zoneRankingsField = zoneRankingsArgs.Count > 0
             ? $"zoneRankings({string.Join(", ", zoneRankingsArgs)})"
@@ -262,17 +272,17 @@ query GetCharacter({string.Join(", ", varDecls)}) {{
         var body = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
-            return new CharacterResult(name, false, null, null, null, null, null, null, new(), $"HTTP {(int)response.StatusCode}: {body}");
+            return new CharacterResult(name, false, null, null, null, null, null, null, new(), $"HTTP {(int)response.StatusCode}: {body}", body);
 
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
 
         if (root.TryGetProperty("errors", out var errors))
-            return new CharacterResult(name, false, null, null, null, null, null, null, new(), errors.ToString());
+            return new CharacterResult(name, false, null, null, null, null, null, null, new(), errors.ToString(), body);
 
         var character = root.GetProperty("data").GetProperty("characterData").GetProperty("character");
         if (character.ValueKind == JsonValueKind.Null)
-            return new CharacterResult(name, false, null, null, null, null, null, null, new(), "character not found (null)");
+            return new CharacterResult(name, false, null, null, null, null, null, null, new(), "character not found (null)", body);
 
         int? classId = character.TryGetProperty("classID", out var cid) && cid.ValueKind == JsonValueKind.Number
             ? cid.GetInt32() : null;
@@ -282,7 +292,7 @@ query GetCharacter({string.Join(", ", varDecls)}) {{
         {
             var raw = character.GetRawText();
             if (raw.Length > 500) raw = raw[..500] + "...(truncated)";
-            return new CharacterResult(name, false, null, null, null, null, classId, className, new(), $"no zoneRankings - raw character JSON: {raw}");
+            return new CharacterResult(name, false, null, null, null, null, classId, className, new(), $"no zoneRankings - raw character JSON: {raw}", body);
         }
 
         double? best = zoneRankings.TryGetProperty("bestPerformanceAverage", out var b) && b.ValueKind == JsonValueKind.Number
@@ -318,6 +328,6 @@ query GetCharacter({string.Join(", ", varDecls)}) {{
             if (ilvls.Count > 0) avgIlvl = ilvls.Average();
         }
 
-        return new CharacterResult(name, true, best, median, avgIlvl, spec, classId, className, perBoss, null);
+        return new CharacterResult(name, true, best, median, avgIlvl, spec, classId, className, perBoss, null, body);
     }
 }

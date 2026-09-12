@@ -42,7 +42,7 @@ The addon only writes to disk when the game saves SavedVariables — on
 |---|---|
 | Game client | Interface 20504 (Burning Crusade-era / Anniversary realms) |
 | Companion app | Windows, [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build |
-| API access | A WarcraftLogs API client (free) |
+| API access | A WarcraftLogs V2 API client (free) |
 
 The addon's Group Finder scan relies on the flat-return form of
 `C_LFGList.GetSearchResultInfo`, where `leader` is the 12th return value. That
@@ -69,7 +69,7 @@ Enable it at the character-select screen and log in. You should see a green
 
 ### 2. Get WarcraftLogs API credentials
 
-Go to your WarcraftLogs profile → **API Clients** → **Create Client**. Any name
+Go to your WarcraftLogs profile → **API Clients** → **Create Client** -> **Manage your V2 Clients**. Any name
 and redirect URL will do; this app uses the client-credentials flow and never
 opens a browser. Copy the client ID and secret.
 

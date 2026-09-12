@@ -24,6 +24,12 @@
             <TextBlock Text="Raid tier" FontWeight="Bold"/>
             <ComboBox x:Name="RaidTierCombo" Margin="0,2,0,14" DisplayMemberPath="Name"/>
 
+            <TextBlock Text="Parse categories to query" FontWeight="Bold" Margin="0,0,0,4"/>
+            <CheckBox x:Name="QueryOverallCheck" Content="Overall" IsChecked="True"/>
+            <CheckBox x:Name="QueryDpsCheck" Content="DPS" IsChecked="True"/>
+            <CheckBox x:Name="QueryHealCheck" Content="Healer" IsChecked="True"/>
+            <CheckBox x:Name="QueryTankCheck" Content="Tank" IsChecked="True" Margin="0,0,0,14"/>
+
             <TextBlock Text="Classes (none checked = any)" FontWeight="Bold" Margin="0,0,0,4"/>
             <CheckBox x:Name="ClassWarrior" Content="Warrior"/>
             <CheckBox x:Name="ClassPaladin" Content="Paladin"/>
@@ -36,7 +42,11 @@
             <CheckBox x:Name="ClassDruid" Content="Druid"/>
 
             <Button x:Name="RunButton" Content="Run" Margin="0,16,0,6" Padding="0,6" Click="RunButton_Click"/>
-            <Button x:Name="WatchButton" Content="Start Watching" Padding="0,6" Click="WatchButton_Click"/>
+            <Button x:Name="WatchButton" Content="Start Watching" Padding="0,6" Margin="0,0,0,6" Click="WatchButton_Click"/>
+            <Button x:Name="ViewBlacklistButton" Content="View Blacklist..." Padding="0,4" Click="ViewBlacklistButton_Click"/>
+
+            <TextBlock Text="Whisper message template" FontWeight="Bold" Margin="0,10,0,4"/>
+            <TextBox x:Name="WhisperTemplateBox" Text="Hey! Want to join our raid?" TextWrapping="Wrap" AcceptsReturn="True" Height="50" Margin="0,0,0,10"/>
 
             <TextBlock x:Name="StatusText" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="Gray"/>
 
@@ -45,11 +55,21 @@
         </StackPanel>
 
         <!-- Right: results -->
-        <DataGrid x:Name="ResultsGrid" Grid.Column="1" AutoGenerateColumns="False" IsReadOnly="True">
+        <DataGrid x:Name="ResultsGrid" Grid.Column="1" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectionMode="Extended" SelectionUnit="FullRow">
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Blacklist selected" Click="BlacklistSelected_Click"/>
+                    <MenuItem Header="Copy whisper messages for selected" Click="CopyWhispers_Click"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
-                <DataGridTextColumn Header="Parse %" Binding="{Binding BestParsePercent}" Width="70"/>
+                <DataGridTextColumn Header="Overall %" Binding="{Binding OverallParsePercent}" Width="75"/>
+                <DataGridTextColumn Header="DPS %" Binding="{Binding DpsParsePercent}" Width="70"/>
+                <DataGridTextColumn Header="Heal %" Binding="{Binding HealParsePercent}" Width="70"/>
+                <DataGridTextColumn Header="Tank %" Binding="{Binding TankParsePercent}" Width="70"/>
                 <DataGridTextColumn Header="Ilvl" Binding="{Binding AverageItemLevel}" Width="60"/>
                 <DataGridTextColumn Header="Class" Binding="{Binding ClassName}" Width="80"/>
                 <DataGridTextColumn Header="Spec" Binding="{Binding Spec}" Width="100"/>

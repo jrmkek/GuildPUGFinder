@@ -1,7 +1,7 @@
 -- GuildPUGFinder - Core.lua
 -- Step 1: collect candidate names from the Group Finder (LFGList) tool and
--- from LFM/LFG chat spam, and write them to SavedVariables so an external
--- app can read them after a /reload or logout.
+-- write them to SavedVariables so an external app can read them after a
+-- /reload or logout.
 
 local ADDON_NAME = ...
 
@@ -11,14 +11,12 @@ local ADDON_NAME = ...
 -- Structure written to disk:
 -- GuildPUGFinderDB = {
 --   pending = {
---     ["Playername-Realm"] = {
---       source    = "lfglist" | "chat",
---       activity  = "<listing title, lfglist only>",
---       comment   = "<listing description, lfglist only>",
---       ilvl      = <number, lfglist only>,
---       members   = <number, lfglist only>,
---       channel   = "<chat event name, chat only>",
---       message   = "<raw chat line, chat only>",
+--     ["LeaderName"] = {
+--       source    = "lfglist",
+--       activity  = "<listing title>",
+--       comment   = "<listing description>",
+--       ilvl      = <number>,
+--       members   = <number>,
 --       seenAt    = <epoch seconds>,
 --     },
 --     ...
@@ -29,7 +27,6 @@ GuildPUGFinderDB = GuildPUGFinderDB or { pending = {}, lastScan = 0 }
 
 local function AddCandidate(name, data)
     if not name or name == "" then return end
-    -- normalize: strip realm if present for now, keep both forms available
     GuildPUGFinderDB.pending[name] = GuildPUGFinderDB.pending[name] or {}
     for k, v in pairs(data) do
         GuildPUGFinderDB.pending[name][k] = v
@@ -40,13 +37,11 @@ end
 --------------------------------------------------------------------------
 -- Group Finder (LFGList) scanning
 --------------------------------------------------------------------------
--- Confirmed for this client build:
+-- Confirmed for this client build via a live /pugscan dump:
 --   numResults, resultIDs = C_LFGList.GetSearchResults()
---   id, _, name, desc, _, ilvl, timeElapsed, _, _, _, _, leader, members, _
---       = C_LFGList.GetSearchResultInfo(resultID)
--- i.e. GetSearchResultInfo returns flat values, not a struct table, and
--- "leader" is the 12th return value. This is the classic/backport-era
--- signature, distinct from modern retail's table-based API.
+--   info = C_LFGList.GetSearchResultInfo(resultID)  -- a table with fields:
+--     info.leaderName, info.name, info.comment,
+--     info.requiredItemLevel, info.numMembers, ...
 
 local function ScanLFGList()
     if not C_LFGList or not C_LFGList.GetSearchResults then
@@ -60,20 +55,47 @@ local function ScanLFGList()
         return
     end
 
+    -- Fresh snapshot every scan: wipe stale candidates from a previous
+    -- activity/category before capturing the current search's results.
+    GuildPUGFinderDB.pending = {}
+
     local found = 0
     for _, resultID in ipairs(resultIDs) do
-        local id, _, name, desc, _, ilvl, timeElapsed, _, _, _, _, leader, members =
-            C_LFGList.GetSearchResultInfo(resultID)
+        local info = C_LFGList.GetSearchResultInfo(resultID)
+        if type(info) == "table" then
+            local leader = info.leaderName
+            local numMembers = info.numMembers or 1
 
-        if leader and leader ~= "" then
-            AddCandidate(leader, {
-                source   = "lfglist",
-                activity = name,
-                comment  = desc,
-                ilvl     = ilvl,
-                members  = members,
-            })
-            found = found + 1
+            -- Skip listings where the leader already has a group (they're
+            -- recruiting FOR their own raid, not looking to join ours).
+            -- Only solo self-listings (numMembers == 1) are candidates.
+            if leader and leader ~= "" and numMembers <= 1 then
+                -- Confirmed via live /pugscan dumpmember: member(1) returns
+                -- role, classFileName, className, ..., isLeader, ...
+                -- className (3rd return) is the properly-capitalized name
+                -- ("Hunter", "Warrior", etc) that matches the Windows app's
+                -- class filter list.
+                local className = nil
+                local role = nil
+                if C_LFGList.GetSearchResultMemberInfo then
+                    local ok, r, _, cName = pcall(C_LFGList.GetSearchResultMemberInfo, resultID, 1)
+                    if ok then
+                        className = cName
+                        role = r
+                    end
+                end
+
+                AddCandidate(leader, {
+                    source    = "lfglist",
+                    activity  = info.name,
+                    comment   = info.comment,
+                    ilvl      = info.requiredItemLevel,
+                    members   = info.numMembers,
+                    className = className,
+                    role      = role,
+                })
+                found = found + 1
+            end
         end
     end
 
@@ -88,48 +110,78 @@ local function DumpLFGList()
     local numResults, resultIDs = C_LFGList.GetSearchResults()
     print(("GuildPUGFinder: %s result(s)"):format(tostring(numResults)))
     for _, resultID in ipairs(resultIDs or {}) do
-        local id, unk1, name, desc, unk2, ilvl, timeElapsed, unk3, unk4, unk5, unk6, leader, members, unk7 =
-            C_LFGList.GetSearchResultInfo(resultID)
+        local info = C_LFGList.GetSearchResultInfo(resultID)
         print("---- resultID", resultID, "----")
-        print("  id       =", tostring(id))
-        print("  name     =", tostring(name))
-        print("  desc     =", tostring(desc))
-        print("  ilvl     =", tostring(ilvl))
-        print("  leader   =", tostring(leader))
-        print("  members  =", tostring(members))
-    end
-end
-
---------------------------------------------------------------------------
--- Chat scanning (LFG/LFM spam in Trade / LFG channels, yell, say)
---------------------------------------------------------------------------
--- Very deliberately simple keyword match. Tune this list to your server's
--- conventions (raid abbreviations, "need heals", etc.) once you see real
--- chat traffic in /pugscan dumpchat or via the saved table.
-local KEYWORDS = {
-    "LFM", "LFG", "LOOKING FOR", "NEED %d+", "RAID INV", "KARA", "GRUUL",
-    "MAGTHERIDON", "SSC", "TK", "HYJAL", "BT", "SUNWELL",
-}
-
-local function MessageLooksLikeGroupCall(msg)
-    local upper = msg:upper()
-    for _, kw in ipairs(KEYWORDS) do
-        if upper:find(kw) then
-            return true
+        if type(info) == "table" then
+            for k, v in pairs(info) do
+                print("  ", tostring(k), "=", tostring(v))
+            end
+        else
+            print("  (not a table, got:", type(info), ")")
         end
     end
-    return false
 end
 
-local function OnChatMessage(event, message, sender, ...)
-    if not MessageLooksLikeGroupCall(message) then return end
-    -- sender comes through as "Name" or "Name-Realm" depending on channel
-    local name = sender:match("^([^%-]+)") or sender
-    AddCandidate(name, {
-        source  = "chat",
-        channel = event,
-        message = message,
-    })
+-- Debug helper: test whether GetSearchResultMemberInfo exposes class data
+-- for a listing's member(s) - if it does, we could skip querying WCL for
+-- candidates whose class we already know isn't wanted, saving rate-limit
+-- budget. Unverified until tested live.
+local function DumpMemberInfo()
+    if not C_LFGList or not C_LFGList.GetSearchResults then return end
+    local numResults, resultIDs = C_LFGList.GetSearchResults()
+    print(("GuildPUGFinder: testing member info on %s result(s)"):format(tostring(numResults)))
+
+    for _, resultID in ipairs(resultIDs or {}) do
+        local info = C_LFGList.GetSearchResultInfo(resultID)
+        local leaderName = type(info) == "table" and info.leaderName or "?"
+        print(("---- resultID %s (leader: %s) ----"):format(tostring(resultID), leaderName))
+
+        if C_LFGList.GetSearchResultMemberInfo then
+            local ok, a, b, c, d, e, f, g, h = pcall(C_LFGList.GetSearchResultMemberInfo, resultID, 1)
+            if ok then
+                print("  member(1) raw returns:", tostring(a), tostring(b), tostring(c), tostring(d), tostring(e), tostring(f), tostring(g), tostring(h))
+                -- if the first return is itself a table, dump its fields too
+                if type(a) == "table" then
+                    for k, v in pairs(a) do
+                        print("    ", tostring(k), "=", tostring(v))
+                    end
+                end
+            else
+                print("  GetSearchResultMemberInfo call failed:", tostring(a))
+            end
+        else
+            print("  C_LFGList.GetSearchResultMemberInfo does not exist on this client.")
+        end
+    end
+end
+
+-- Debug helper: test whether GetSearchResultMemberCounts is the real
+-- source of the role icons shown in Blizzard's own Group Finder panel -
+-- our GetSearchResultMemberInfo-based role capture has been shown wrong
+-- (a confirmed healer was captured as DAMAGER), so this checks the other
+-- likely candidate function instead.
+local function DumpMemberCounts()
+    if not C_LFGList or not C_LFGList.GetSearchResults then return end
+    local numResults, resultIDs = C_LFGList.GetSearchResults()
+    print(("GuildPUGFinder: testing member counts on %s result(s)"):format(tostring(numResults)))
+
+    for _, resultID in ipairs(resultIDs or {}) do
+        local info = C_LFGList.GetSearchResultInfo(resultID)
+        local leaderName = type(info) == "table" and info.leaderName or "?"
+
+        if C_LFGList.GetSearchResultMemberCounts then
+            local ok, a, b, c, d, e, f, g = pcall(C_LFGList.GetSearchResultMemberCounts, resultID)
+            if ok then
+                print(("%s: raw returns: %s %s %s %s %s %s %s"):format(
+                    leaderName, tostring(a), tostring(b), tostring(c), tostring(d), tostring(e), tostring(f), tostring(g)))
+            else
+                print(("%s: GetSearchResultMemberCounts failed: %s"):format(leaderName, tostring(a)))
+            end
+        else
+            print("C_LFGList.GetSearchResultMemberCounts does not exist on this client.")
+            break
+        end
+    end
 end
 
 --------------------------------------------------------------------------
@@ -137,9 +189,7 @@ end
 --------------------------------------------------------------------------
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("CHAT_MSG_CHANNEL")
-frame:RegisterEvent("CHAT_MSG_YELL")
-frame:RegisterEvent("CHAT_MSG_SAY")
+frame:RegisterEvent("LFG_LIST_SEARCH_RESULTS_RECEIVED")
 
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -150,9 +200,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
         return
     end
 
-    if event == "CHAT_MSG_CHANNEL" or event == "CHAT_MSG_YELL" or event == "CHAT_MSG_SAY" then
-        local message, sender = ...
-        OnChatMessage(event, message, sender)
+    if event == "LFG_LIST_SEARCH_RESULTS_RECEIVED" then
+        -- Fires when a new search (new category/activity/refresh) returns
+        -- results. Auto re-scan so the list stays current without a manual
+        -- /pugscan every time you switch raids.
+        ScanLFGList()
     end
 end)
 
@@ -164,6 +216,10 @@ SlashCmdList["GUILDPUGFINDER"] = function(msg)
     msg = (msg or ""):trim():lower()
     if msg == "dump" then
         DumpLFGList()
+    elseif msg == "dumpmember" then
+        DumpMemberInfo()
+    elseif msg == "dumpcounts" then
+        DumpMemberCounts()
     elseif msg == "clear" then
         GuildPUGFinderDB.pending = {}
         print("|cff00ff00GuildPUGFinder:|r cleared pending candidate list.")
@@ -171,7 +227,8 @@ SlashCmdList["GUILDPUGFINDER"] = function(msg)
         local count = 0
         for name, data in pairs(GuildPUGFinderDB.pending) do
             count = count + 1
-            print(("  %s  [%s]  %s"):format(name, data.source, data.activity or data.message or ""))
+            print(("  %s  [%s]  %s"):format(
+                name, data.source, data.activity or ""))
         end
         print(("|cff00ff00GuildPUGFinder:|r %d pending candidate(s)."):format(count))
     else
