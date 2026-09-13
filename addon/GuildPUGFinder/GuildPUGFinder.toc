@@ -1,10 +1,9 @@
 ## Interface: 20504
 ## Title: GuildPUGFinder
-## Notes: Collects Group Finder listings and LFM/LFG chat spam into SavedVariables for external gear/parse lookup.
-## Author: GuildPUGFinder contributors
-## Version: 0.1.0
-## X-License: MIT
-## X-Category: Group Finder
+## Notes: Collects Group Finder listings for external gear/parse lookup, and shows/whispers eligible candidates in-game.
+## Author: YourGuild
+## Version: 0.2.0
 ## SavedVariables: GuildPUGFinderDB
 
 Core.lua
+MessageUI.lua

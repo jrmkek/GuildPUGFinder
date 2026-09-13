@@ -1,5 +1,6 @@
 // PipelineRunner.cs
 using System.IO;
+using System.Collections.Concurrent;
 
 namespace GuildPUGFinderApp;
 
@@ -9,23 +10,32 @@ public class PipelineRunner
 
     // Session-lifetime cache (survives across separate Run/Watch triggers,
     // since a new PipelineRunner is created each time but this is static).
-    // Keyed by everything that affects the result, so different filters
-    // don't collide.
+    // ConcurrentDictionary since multiple candidates are now processed in
+    // parallel and can hit this at the same time.
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(20);
-    private static readonly Dictionary<string, (CharacterResult Result, DateTime FetchedAt)> _cache = new();
+    private static readonly ConcurrentDictionary<string, (CharacterResult Result, DateTime FetchedAt)> _cache = new();
 
     // TBC role capability - a class either can or can't fill a role, no
     // ambiguity, so skipping is safe and never loses real data.
     private static readonly HashSet<string> TankCapableClasses = new(StringComparer.OrdinalIgnoreCase) { "Warrior", "Druid", "Paladin" };
     private static readonly HashSet<string> HealCapableClasses = new(StringComparer.OrdinalIgnoreCase) { "Priest", "Druid", "Paladin", "Shaman" };
 
+    // How many candidates get processed at once. Each candidate can itself
+    // fire up to 4 sequential queries (Overall/DPS/Heal/Tank), so this
+    // isn't the same as "max concurrent HTTP calls" - it's roughly
+    // MaxConcurrentCandidates x (up to 4) in flight at a time. Kept modest
+    // to avoid hammering WCL or tripping any per-connection limits.
+    private const int MaxConcurrentCandidates = 6;
+
     public PipelineRunner(Config config)
     {
         _config = config;
     }
 
-    // onRow is called once per candidate as results come in, so a UI can
-    // update a live list instead of waiting for the whole batch.
+    // onRow is called once per candidate as results come in (from
+    // whichever worker finishes it - not guaranteed to be in pending's
+    // original order, since candidates now run concurrently). A UI can
+    // still update a live list the same way as before.
     public async Task<List<CandidateRow>> RunAsync(RunOptions options, Action<CandidateRow>? onRow = null, bool forceFresh = false)
     {
         if (!File.Exists(_config.SavedVariablesPath))
@@ -45,10 +55,6 @@ public class PipelineRunner
         {
             var (limit, spent, resetInSeconds) = rateLimit.Value;
             double remaining = limit - spent;
-            // Rough safety margin: cost per candidate now depends on how
-            // many categories are checked (1-4 queries) - if we're already
-            // near the cap, bail loudly instead of burning through and
-            // returning a wall of misleading NoData results.
             int queriesPerCandidate = (options.QueryOverall ? 1 : 0) + (options.QueryDps ? 1 : 0)
                 + (options.QueryHeal ? 1 : 0) + (options.QueryTank ? 1 : 0);
             if (remaining < pending.Count * Math.Max(queriesPerCandidate, 1) * 1.5)
@@ -60,11 +66,9 @@ public class PipelineRunner
             }
         }
 
-        var rows = new List<CandidateRow>();
-        var eligible = new Dictionary<string, object?>();
+        var rows = new ConcurrentBag<CandidateRow>();
+        var eligible = new ConcurrentDictionary<string, object?>();
 
-        // Raw API responses get logged here so you can inspect exactly
-        // what WCL sent back, not just the computed pass/fail numbers.
         string logDir = Path.Combine(AppContext.BaseDirectory, "logs", DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
         Directory.CreateDirectory(logDir);
 
@@ -93,38 +97,25 @@ public class PipelineRunner
             return result;
         }
 
-        foreach (var (name, candidateData) in pending)
+        async Task ProcessCandidateAsync(string name, object? candidateData)
         {
-            if (options.BlacklistedNames.Contains(name))
-            {
-                continue; // blacklisted - no query, no row, ever
-            }
+            if (options.BlacklistedNames.Contains(name)) return;
 
-            // Class is captured client-side by the addon (via
-            // GetSearchResultMemberInfo) and stored per-candidate. If we
-            // have it and it doesn't match the selected filter, skip the
-            // WCL query entirely. If it's missing (older scan, or the
-            // addon-side lookup failed), fall back to querying anyway
-            // since we can't know the class ahead of time otherwise.
             string? preKnownClass = candidateData is Dictionary<string, object?> data
                 && data.TryGetValue("className", out var cn) ? cn as string : null;
 
             if (options.AllowedClasses.Count > 0 && preKnownClass != null
                 && !options.AllowedClasses.Contains(preKnownClass))
             {
-                continue; // skip entirely - no query, no row
+                return; // skip entirely - no query, no row
             }
 
-            // Query only the categories the user checked - skipping one
-            // entirely saves rate-limit budget, not just hides a column.
-            // Also skip Heal/Tank automatically when the class flat-out
-            // can't fill that role in TBC (e.g. Mage can never tank) -
-            // this is a hard game-mechanics fact, not a guess, so it never
-            // loses real data. Falls back to querying anyway if class is
-            // unknown (older scan / addon lookup failed).
             bool canTank = preKnownClass == null || TankCapableClasses.Contains(preKnownClass);
             bool canHeal = preKnownClass == null || HealCapableClasses.Contains(preKnownClass);
 
+            // The 4 categories for THIS candidate still run one after
+            // another (sequential awaits) - it's candidates themselves
+            // that run in parallel with each other via the semaphore below.
             CharacterResult? overallResult = options.QueryOverall ? await FetchCachedAsync(name, null) : null;
             CharacterResult? dpsResult = options.QueryDps ? await FetchCachedAsync(name, "DPS") : null;
             CharacterResult? healResult = (options.QueryHeal && canHeal) ? await FetchCachedAsync(name, "Healer") : null;
@@ -135,10 +126,6 @@ public class PipelineRunner
             double? healParse = healResult?.BestParsePercent;
             double? tankParse = tankResult?.BestParsePercent;
 
-            // Best-of and the data source (ilvl/spec/class/per-boss) are
-            // computed only from categories that were actually queried -
-            // if you only checked Healer, that's the only number that can
-            // win, and it's also where ilvl/spec come from.
             double? bestOfAll = new[] { overallParse, dpsParse, healParse, tankParse }
                 .Where(v => v.HasValue).Select(v => v!.Value).DefaultIfEmpty().Max() is var m && m > 0 ? m : (double?)null;
 
@@ -151,13 +138,7 @@ public class PipelineRunner
                 bestOfAll.HasValue && tankResult != null && bestOfAll == tankParse ? tankResult :
                 queried.FirstOrDefault(r => r.Found) ?? queried.FirstOrDefault();
 
-            if (dataSource == null)
-            {
-                // Nothing was checked at all - nothing to do for this
-                // candidate. Shouldn't normally happen since the UI should
-                // prevent zero categories selected, but guard anyway.
-                continue;
-            }
+            if (dataSource == null) return;
 
             string? effectiveClassName = preKnownClass ?? dataSource.ClassName;
 
@@ -169,8 +150,6 @@ public class PipelineRunner
             }
             else if (!dataSource.Found && dataSource.RawError != null && !dataSource.RawError.StartsWith("no zoneRankings"))
             {
-                // A real failure (bad query, auth problem, HTTP error, etc.)
-                // - surface it instead of silently lumping it in with NoData.
                 status = CandidateStatus.Error;
             }
             else if (!bestOfAll.HasValue || !dataSource.AverageItemLevel.HasValue)
@@ -213,10 +192,19 @@ public class PipelineRunner
             }
         }
 
-        table["eligible"] = eligible;
+        using var gate = new SemaphoreSlim(MaxConcurrentCandidates);
+        var tasks = pending.Select(async kv =>
+        {
+            await gate.WaitAsync();
+            try { await ProcessCandidateAsync(kv.Key, kv.Value); }
+            finally { gate.Release(); }
+        });
+        await Task.WhenAll(tasks);
+
+        table["eligible"] = new Dictionary<string, object?>(eligible);
         var newLuaText = LuaTableParser.Serialize(varName, table);
         File.WriteAllText(_config.SavedVariablesPath, newLuaText);
 
-        return rows;
+        return rows.ToList();
     }
 }

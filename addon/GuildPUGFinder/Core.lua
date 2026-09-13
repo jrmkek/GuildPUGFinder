@@ -195,7 +195,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         local loaded = ...
         if loaded == ADDON_NAME then
-            print("|cff00ff00GuildPUGFinder|r loaded. Use /pugscan to scan Group Finder, /pugscan dump to inspect raw fields.")
+            print("|cff00ff00GuildPUGFinder|r loaded. Use /pugscan to scan Group Finder, /pugmsg to whisper eligible candidates, /pugscan dump to inspect raw fields.")
         end
         return
     end

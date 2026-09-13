@@ -55,6 +55,9 @@ query {
   roleType: __type(name: "RoleType") {
     enumValues { name }
   }
+  characterType: __type(name: "Character") {
+    fields { name description type { name kind ofType { name kind } } }
+  }
 }
 "@
     $body = @{ query = $query } | ConvertTo-Json
@@ -65,6 +68,12 @@ query {
 
     Write-Host "`nValid 'role' values:" -ForegroundColor Cyan
     $result.data.roleType.enumValues.name | ForEach-Object { Write-Host "  $_" }
+
+    Write-Host "`nCharacter type fields (looking for lighter alternatives to zoneRankings):" -ForegroundColor Cyan
+    $result.data.characterType.fields | ForEach-Object {
+        $typeName = if ($_.type.name) { $_.type.name } elseif ($_.type.ofType.name) { $_.type.ofType.name } else { $_.type.kind }
+        Write-Host ("  {0}: {1}" -f $_.name, $typeName)
+    }
     exit
 }
 
