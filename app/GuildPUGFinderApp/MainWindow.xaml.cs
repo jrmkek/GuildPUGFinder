@@ -62,6 +62,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ResultsGrid.ItemsSource = _rows;
+        var copyMenu = new System.Windows.Controls.ContextMenu();
+        var copyNamesItem = new System.Windows.Controls.MenuItem { Header = "Copy name(s)" };
+        copyNamesItem.Click += CopySelectedNames_Click;
+        copyMenu.Items.Add(copyNamesItem);
+        ResultsGrid.ContextMenu = copyMenu;
         RaidTierCombo.ItemsSource = _zoneOptions;
         RaidTierCombo.SelectedIndex = 0;
         LoadConfig();
@@ -327,24 +332,37 @@ public partial class MainWindow : Window
         window.ShowDialog();
     }
 
-    private void CopyWhispers_Click(object sender, RoutedEventArgs e)
+    private void ResultsGrid_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        var selected = ResultsGrid.SelectedItems.Cast<CandidateRowView>().ToList();
-        if (selected.Count == 0) return;
+        var source = e.OriginalSource as DependencyObject;
+        while (source != null && source is not System.Windows.Controls.DataGridRow)
+            source = System.Windows.Media.VisualTreeHelper.GetParent(source);
 
-        string template = WhisperTemplateBox.Text;
-        string text = string.Join("\n", selected.Select(r => $"/w {r.Name} {template}"));
+        if (source is not System.Windows.Controls.DataGridRow row || row.Item is not CandidateRowView)
+            return;
 
-        try
+        if (!row.IsSelected)
         {
-            Clipboard.SetText(text);
-            StatusText.Text = $"Copied {selected.Count} whisper command(s) to clipboard.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Couldn't copy to clipboard: {ex.Message}";
+            ResultsGrid.SelectedItems.Clear();
+            row.IsSelected = true;
         }
     }
+
+    private void CopySelectedNames_Click(object sender, RoutedEventArgs e)
+    {
+        var names = ResultsGrid.SelectedItems
+            .Cast<CandidateRowView>()
+            .Select(row => row.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList();
+
+        if (names.Count == 0) return;
+
+        Clipboard.SetText(string.Join(Environment.NewLine, names));
+        StatusText.Text = $"Copied {names.Count} name(s) to the clipboard.";
+    }
+
+   
 
     private async void RunButton_Click(object sender, RoutedEventArgs e)
     {

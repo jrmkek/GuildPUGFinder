@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
-    <ApplicationIcon>app-icon.ico</ApplicationIcon>
+    <ApplicationIcon>gpf.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup>
